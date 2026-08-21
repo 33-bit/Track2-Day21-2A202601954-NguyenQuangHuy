@@ -71,6 +71,12 @@ jobs:
         run: dvc pull data/train_phase1.csv data/eval.csv
 
       - name: Train model
+        # Bonus 1: Neu set secret MLFLOW_* thi MLflow ghi len server tu xa
+        # (vi du DagsHub). Neu khong, tu dong dung file cuc bo mlruns/.
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
         run: python src/train.py
 
       - name: Read metrics
@@ -98,13 +104,21 @@ jobs:
           blob = bucket.blob("models/latest/model.pkl")
           blob.upload_from_filename("models/model.pkl")
           print(f"Uploaded model to gs://{bucket_name}/models/latest/model.pkl")
+
+          # Bonus 4: upload metrics.json de lan chay sau co the so sanh
+          # accuracy cu va moi (rollback check).
+          mblob = bucket.blob("models/latest/metrics.json")
+          mblob.upload_from_filename("outputs/metrics.json")
+          print(f"Uploaded metrics to gs://{bucket_name}/models/latest/metrics.json")
           EOF
 
       - name: Save metrics as artifact
         uses: actions/upload-artifact@v4
         with:
           name: metrics
-          path: outputs/metrics.json
+          path: |
+            outputs/metrics.json
+            outputs/report.txt
 
 
   # ---------------------------------------------------------------------------
@@ -119,9 +133,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
+      - name: Authenticate to Cloud Storage
+        env:
+          CLOUD_CREDENTIALS: ${{ secrets.CLOUD_CREDENTIALS }}
+        run: |
+          echo "$CLOUD_CREDENTIALS" > /tmp/sa-key.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json" >> $GITHUB_ENV
+
       - name: Check eval gate
         # TODO 6: Doc accuracy tu output cua job train.
-        #         Neu accuracy < 0.70, ket thuc voi loi ro rang.
+        #         Neu accuracy < 0.68, ket thuc voi loi ro rang.
         #         Neu dat nguong, in thong bao va tiep tuc.
         env:
           ACCURACY: ${{ needs.train.outputs.accuracy }}
@@ -131,7 +152,40 @@ jobs:
           acc = float(os.environ["ACCURACY"])
           if acc < 0.68:
               raise SystemExit(f"FAILED: accuracy {acc:.4f} < 0.68. Huy deploy.")
-          print(f"PASSED: accuracy {acc:.4f} >= 0.68. Dang trien khai model.")
+          print(f"PASSED: accuracy {acc:.4f} >= 0.68.")
+          EOF
+
+      - name: Check rollback (compare with previous accuracy)
+        # Bonus 4: tai metrics.json cua lan chay truoc tu cloud storage.
+        # Neu accuracy moi thap hon accuracy cu -> huy deploy (rollback).
+        env:
+          ACCURACY: ${{ needs.train.outputs.accuracy }}
+          CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
+        run: |
+          python - <<'EOF'
+          import os, json
+          from google.cloud import storage
+
+          new_acc = float(os.environ["ACCURACY"])
+          bucket_name = os.environ["CLOUD_BUCKET"]
+
+          client = storage.Client()
+          bucket = client.bucket(bucket_name)
+          blob = bucket.blob("models/latest/metrics.json")
+
+          if not blob.exists():
+              print(f"No previous metrics found. First deploy -> continue. (new acc={new_acc:.4f})")
+              exit(0)
+
+          old = json.loads(blob.download_as_text())
+          old_acc = float(old["accuracy"])
+          print(f"Previous accuracy: {old_acc:.4f} | New accuracy: {new_acc:.4f}")
+
+          if new_acc < old_acc:
+              raise SystemExit(
+                  f"ROLLBACK: new accuracy {new_acc:.4f} < old {old_acc:.4f}. Huy deploy."
+              )
+          print(f"OK: new accuracy {new_acc:.4f} >= old {old_acc:.4f}. Tien hanh deploy.")
           EOF
 
 
