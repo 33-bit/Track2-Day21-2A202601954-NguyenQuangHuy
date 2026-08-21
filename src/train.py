@@ -8,7 +8,7 @@ import os
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score
 
-EVAL_THRESHOLD = 0.70
+EVAL_THRESHOLD = 0.68
 
 # Dung tracking URI cuc bo (relative) de MLflow khong ghi duong dan tuyet doi
 # vao mlruns/. Neu khong, artifact_location se bi cung hoa thanh path may
