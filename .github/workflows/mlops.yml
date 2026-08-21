@@ -156,5 +156,13 @@ jobs:
             # TODO 7: Restart service mlops-serve tren VM.
             sudo systemctl restart mlops-serve
             # TODO 8: Cho server san sang roi goi curl /health de xac nhan.
-            sleep 5
-            curl -sf http://localhost:8000/health && echo "Health check passed." || exit 1
+            # Retry loop: service can ~10s de tai model va khoi dong uvicorn.
+            for i in $(seq 1 30); do
+              if curl -sf http://localhost:8000/health; then
+                echo "Health check passed."
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "Health check failed after 60s."
+            exit 1
