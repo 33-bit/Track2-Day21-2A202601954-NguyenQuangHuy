@@ -10,6 +10,11 @@ from sklearn.metrics import accuracy_score, f1_score
 
 EVAL_THRESHOLD = 0.70
 
+# Dung tracking URI cuc bo (relative) de MLflow khong ghi duong dan tuyet doi
+# vao mlruns/. Neu khong, artifact_location se bi cung hoa thanh path may
+# local (vd /Users/...) va gay loi Permission denied khi chay tren CI Linux.
+mlflow.set_tracking_uri(f"file://{os.getcwd()}/mlruns")
+
 
 def train(
     params: dict,
