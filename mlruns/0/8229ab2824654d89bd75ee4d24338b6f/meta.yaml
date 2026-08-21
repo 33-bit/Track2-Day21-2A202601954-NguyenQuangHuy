@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/33bit/AI/AI%20In%20Action/Lab/Track2-Day21-2A202601954-NguyenQuangHuy/mlruns/0/8229ab2824654d89bd75ee4d24338b6f/artifacts
+end_time: 1787291135812
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 8229ab2824654d89bd75ee4d24338b6f
+run_name: melodic-stoat-121
+run_uuid: 8229ab2824654d89bd75ee4d24338b6f
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1787291134170
+status: 3
+tags: []
+user_id: 33bit
